@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useLocation } from "../../Context/LocationContext";
+import { useLocation } from "../../context/LocationContext";
 import { useNavigate } from "react-router-dom";
 
 function Setting() {
