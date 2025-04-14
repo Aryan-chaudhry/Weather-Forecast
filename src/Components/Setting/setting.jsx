@@ -15,13 +15,18 @@ function LocationMarker({ latLon, address, imageUrl }) {
   return latLon ? (
     <Marker position={[latLon.lat, latLon.lon]}>
       <Popup>
-        <div>
+        <div style={{ textAlign: "center" }}>
           <p>{address}</p>
           {imageUrl && (
             <img
               src={imageUrl}
               alt="Location"
-              style={{ width: "100%", height: "auto", borderRadius: "8px" }}
+              style={{
+                width: "100%", // Ensure it takes up full width of popup
+                maxHeight: "200px", // Limit max height
+                objectFit: "cover", // Ensure it doesn't stretch
+                borderRadius: "8px",
+              }}
             />
           )}
         </div>
