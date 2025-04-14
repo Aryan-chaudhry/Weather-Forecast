@@ -1,137 +1,183 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useLocation } from "../../context/LocationContext";
 import { useNavigate } from "react-router-dom";
+import { FaMapMarkerAlt } from "react-icons/fa";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  useMapEvents,
+} from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+
+function LocationMarker({ latLon }) {
+  return latLon ? <Marker position={[latLon.lat, latLon.lon]} /> : null;
+}
+
+function ClickMapHandler({ setLatLon, setFullAddress, setLocation }) {
+  useMapEvents({
+    click: async (e) => {
+      const lat = e.latlng.lat;
+      const lon = e.latlng.lng;
+      setLatLon({ lat, lon });
+
+      try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`;
+        const res = await fetch(url, {
+          headers: { "User-Agent": "location-app" },
+        });
+        const data = await res.json();
+
+        if (data && data.address) {
+          const address = data.address;
+          const fullAddress = data.display_name;
+          const city = address.city || address.town || address.village || "";
+          const state = address.state || "";
+          const country = address.country || "";
+
+          setFullAddress(fullAddress);
+          setLocation({
+            lat,
+            lon,
+            fullAddress,
+            city,
+            state,
+            country,
+          });
+        }
+      } catch (err) {
+        console.error("Reverse geocoding error:", err);
+      }
+    },
+  });
+  return null;
+}
 
 function Setting() {
   const { setLocation } = useLocation();
-  const [formData, setFormData] = useState({
-    city: "",
-    state: "",
-    country: "",
-  });
-
+  const [fullAddress, setFullAddress] = useState("");
+  const [latLon, setLatLon] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const mapRef = useRef();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFullAddress(e.target.value);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleForwardGeocode = async () => {
+    if (!fullAddress) return;
     setLoading(true);
     setError("");
 
-    // Use only city and country in query for better match accuracy
-    const query = `${formData.city}, ${formData.country}`;
-    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1`;
-
     try {
-      const response = await fetch(url);
+      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(
+        fullAddress
+      )}`;
+      const res = await fetch(url, {
+        headers: { "User-Agent": "location-app" },
+      });
+      const data = await res.json();
 
-      if (!response.ok) {
-        throw new Error("Network response was not ok");
+      if (data.length === 0) {
+        setError("⚠️ Address not found. Try refining it.");
+        return;
       }
 
-      const data = await response.json();
+      const bestMatch = data[0];
+      const lat = parseFloat(bestMatch.lat);
+      const lon = parseFloat(bestMatch.lon);
+      const address = bestMatch.address;
 
-      console.log("Request URL:", url);
-      console.log("API Response:", data);
+      const city = address.city || address.town || address.village || "";
+      const state = address.state || "";
+      const country = address.country || "";
 
-      if (data.results && data.results.length > 0) {
-        const { latitude, longitude, name, country, admin1 } = data.results[0];
+      setLatLon({ lat, lon });
+      setFullAddress(bestMatch.display_name);
 
-        setLocation({
-          city: name,
-          state: formData.state, // Preserve user-entered state
-          country: country || formData.country,
-          lat: parseFloat(latitude),
-          lon: parseFloat(longitude),
-        });
+      // Save to global context
+      setLocation({
+        lat,
+        lon,
+        fullAddress: bestMatch.display_name,
+        city,
+        state,
+        country,
+      });
 
-        navigate("/");
-      } else {
-        setError("❌ Location not found. Try again with just city and country.");
-      }
+      const map = mapRef.current;
+      if (map) map.setView([lat, lon], 13);
     } catch (err) {
-      console.error("Geocoding Error:", err);
-      setError("⚠️ Error fetching location.");
+      console.error("Forward geocoding error:", err);
+      setError("⚠️ Failed to find location from address.");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSaveLocation = () => {
+    if (!latLon) {
+      setError("⚠️ Please select a location from map or address first.");
+      return;
+    }
+
+    navigate("/"); // Done! Context already saved
+  };
+
   return (
-    <div className="relative h-screen w-full overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-black to-purple-900 animate-pulse-slow z-0" />
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 z-0" />
-      <div className="relative z-10 flex justify-center items-center h-full px-4">
-        <form
-          onSubmit={handleSubmit}
-          className="w-full max-w-md bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl rounded-2xl p-8 space-y-6 text-white"
-        >
-          <h2 className="text-3xl font-extrabold text-center text-blue-200 drop-shadow">
-             Set Your Location
-          </h2>
+    <div className="relative h-screen w-full overflow-auto bg-gradient-to-br from-indigo-900 via-black to-purple-900 text-white">
+      <div className="max-w-2xl mx-auto p-6 space-y-4">
+      <h2 className="text-3xl font-bold text-center flex items-center justify-center gap-2">
+  <FaMapMarkerAlt className="text-red-500" />
+  Set Your Exact Location
+</h2>
 
-          {["city", "state", "country"].map((field) => (
-            <div key={field} className="relative">
-              <input
-                type="text"
-                name={field}
-                id={field}
-                placeholder=" "
-                value={formData[field]}
-                onChange={handleChange}
-                required
-                className="peer w-full p-3 rounded-lg border border-gray-500 bg-white/10 text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white/20"
-              />
-              <label
-                htmlFor={field}
-                className="absolute left-3 top-3 text-gray-300 text-sm transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-500 peer-focus:top-0 peer-focus:text-sm peer-focus:text-blue-300"
-              >
-                {field.charAt(0).toUpperCase() + field.slice(1)}
-              </label>
-            </div>
-          ))}
-
-          {error && (
-            <p className="text-red-400 text-center text-sm bg-white/10 border border-red-500/20 rounded p-2">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className={`w-full py-3 rounded-xl font-semibold transition ${
-              loading
-                ? "bg-blue-400 cursor-wait"
-                : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-purple-700 hover:to-blue-700 cursor-pointer"
-            }`}
+        <div className="h-[300px] w-full rounded-xl overflow-hidden shadow border border-white z-0">
+          <MapContainer
+            center={[29.6857, 76.9905]}
+            zoom={10}
+            className="h-full w-full z-0"
+            whenCreated={(mapInstance) => (mapRef.current = mapInstance)}
           >
-            {loading ? "Finding Location..." : "Save Location"}
-          </button>
-        </form>
-      </div>
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <ClickMapHandler
+              setLatLon={setLatLon}
+              setFullAddress={setFullAddress}
+              setLocation={setLocation}
+            />
+            <LocationMarker latLon={latLon} />
+          </MapContainer>
+        </div>
 
-      <style>
-        {`
-          @keyframes pulseSlow {
-            0%, 100% {
-              background-position: 0% 50%;
-            }
-            50% {
-              background-position: 100% 50%;
-            }
-          }
-          .animate-pulse-slow {
-            animation: pulseSlow 15s ease infinite;
-            background-size: 400% 400%;
-          }
-        `}
-      </style>
+        {/* Full Address Input */}
+        <div className="space-y-2">
+          <input
+            type="text"
+            placeholder="Enter full address (e.g. Danialpur, Karnal, Haryana)"
+            value={fullAddress}
+            onChange={handleChange}
+            className="w-full p-3 rounded-lg border border-gray-500 bg-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            onClick={handleForwardGeocode}
+            disabled={loading || !fullAddress}
+            className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+          >
+            Find Location from Address
+          </button>
+        </div>
+
+        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+
+        <button
+          onClick={handleSaveLocation}
+          className="w-full py-3 rounded-xl font-semibold bg-green-600 hover:bg-green-700"
+        >
+          ✅ Save Location
+        </button>
+      </div>
     </div>
   );
 }
