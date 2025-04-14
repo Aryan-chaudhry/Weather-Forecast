@@ -6,12 +6,28 @@ import {
   MapContainer,
   TileLayer,
   Marker,
+  Popup,
   useMapEvents,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
-function LocationMarker({ latLon }) {
-  return latLon ? <Marker position={[latLon.lat, latLon.lon]} /> : null;
+function LocationMarker({ latLon, address, imageUrl }) {
+  return latLon ? (
+    <Marker position={[latLon.lat, latLon.lon]}>
+      <Popup>
+        <div>
+          <p>{address}</p>
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              alt="Location"
+              style={{ width: "100%", height: "auto", borderRadius: "8px" }}
+            />
+          )}
+        </div>
+      </Popup>
+    </Marker>
+  ) : null;
 }
 
 function ClickMapHandler({ setLatLon, setFullAddress, setLocation }) {
@@ -61,6 +77,7 @@ function Setting() {
   const [error, setError] = useState("");
   const mapRef = useRef();
   const navigate = useNavigate();
+  const [imageUrl, setImageUrl] = useState(null); // New state for image URL
 
   const handleChange = (e) => {
     setFullAddress(e.target.value);
@@ -97,6 +114,9 @@ function Setting() {
       setLatLon({ lat, lon });
       setFullAddress(bestMatch.display_name);
 
+      // Optionally set an image URL based on the address or location
+      setImageUrl("https://example.com/path-to-your-image.jpg"); // Replace with actual image URL
+
       // Save to global context
       setLocation({
         lat,
@@ -129,10 +149,10 @@ function Setting() {
   return (
     <div className="relative h-screen w-full overflow-auto bg-gradient-to-br from-indigo-900 via-black to-purple-900 text-white">
       <div className="max-w-2xl mx-auto p-6 space-y-4">
-      <h2 className="text-3xl font-bold text-center flex items-center justify-center gap-2">
-  <FaMapMarkerAlt className="text-red-500" />
-  Set Your Exact Location
-</h2>
+        <h2 className="text-3xl font-bold text-center flex items-center justify-center gap-2">
+          <FaMapMarkerAlt className="text-red-500" />
+          Set Your Exact Location
+        </h2>
 
         <div className="h-[300px] w-full rounded-xl overflow-hidden shadow border border-white z-0">
           <MapContainer
@@ -147,7 +167,7 @@ function Setting() {
               setFullAddress={setFullAddress}
               setLocation={setLocation}
             />
-            <LocationMarker latLon={latLon} />
+            <LocationMarker latLon={latLon} address={fullAddress} imageUrl={imageUrl} />
           </MapContainer>
         </div>
 
