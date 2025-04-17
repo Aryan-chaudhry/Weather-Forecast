@@ -14,13 +14,24 @@ function WeeklyWeather() {
 
   useEffect(() => {
     fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,cloudcover_mean&hourly=temperature_2m,precipitation&timezone=auto`
+      `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&daily=temperature_2m_max,temperature_2m_min,cloudcover_mean&hourly=temperature_2m,precipitation_probability&timezone=auto`
     )
       .then((res) => res.json())
       .then((data) => {
         if (data.daily && data.hourly) {
           const dailyForecast = data.daily.time.map((date, index) => {
             const fullDate = new Date(date);
+            const hourlyStart = index * 24;
+            const hourlyEnd = hourlyStart + 24;
+
+            const hourlyRainChances = data.hourly.precipitation_probability
+              .slice(hourlyStart, hourlyEnd)
+              .map((value) => (value !== null ? value : 0));
+
+            const avgRain =
+              hourlyRainChances.reduce((a, b) => a + b, 0) /
+              hourlyRainChances.length;
+
             return {
               isToday: new Date().toDateString() === fullDate.toDateString(),
               date: fullDate.toLocaleDateString(undefined, {
@@ -30,13 +41,25 @@ function WeeklyWeather() {
               }),
               tempMax: data.daily.temperature_2m_max[index],
               tempMin: data.daily.temperature_2m_min[index],
-              rain: data.daily.precipitation_sum[index], // Total rainfall
+              rain: Math.round(avgRain),
               clouds: data.daily.cloudcover_mean[index],
               hourlyData: Array.from({ length: 24 }, (_, hourIndex) => ({
-                time: `${hourIndex % 12 || 12} ${hourIndex < 12 ? "AM" : "PM"}`,
-                temp: data.hourly.temperature_2m[hourIndex + index * 24],
-                rain: data.hourly.precipitation[hourIndex + index * 24],
-                icon: getWeatherIcon(data.hourly.precipitation[hourIndex + index * 24]),
+                time: `${hourIndex % 12 || 12} ${
+                  hourIndex < 12 ? "AM" : "PM"
+                }`,
+                temp:
+                  data.hourly.temperature_2m[
+                    hourlyStart + hourIndex
+                  ] ?? "N/A",
+                rain:
+                  data.hourly.precipitation_probability[
+                    hourlyStart + hourIndex
+                  ] ?? 0,
+                icon: getWeatherIcon(
+                  data.hourly.precipitation_probability[
+                    hourlyStart + hourIndex
+                  ]
+                ),
               })),
             };
           });
@@ -48,24 +71,20 @@ function WeeklyWeather() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000); // Update every minute
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
   const getWeatherIcon = (rain) => {
-    if (rain > 0) {
-      return "https://openweathermap.org/img/wn/09d@2x.png"; // Rainy icon
-    } else {
-      return "https://openweathermap.org/img/wn/01d@2x.png"; // Clear/Day icon
-    }
+    return rain > 20
+      ? "https://openweathermap.org/img/wn/09d@2x.png"
+      : "https://openweathermap.org/img/wn/01d@2x.png";
   };
 
-  // Handle day click (expanding or collapsing the day)
   const handleDayClick = (index) => {
     setExpandedDay(expandedDay === index ? null : index);
   };
 
-  // Handle the click on an hourly card and automatically scroll to it
   const handleCardClick = (hourIndex) => {
     if (scrollRef.current && cardRefs.current[hourIndex]) {
       cardRefs.current[hourIndex].scrollIntoView({
@@ -98,8 +117,8 @@ function WeeklyWeather() {
             }`}
             onClick={() => handleDayClick(index)}
           >
-            <div className="flex flex-col sm:flex-row justify-between items-center px-30 py-4">
-              <div className="text-lg font-semibold flex gap-15 items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-center px-4 py-4">
+              <div className="text-lg font-semibold flex gap-3 items-center">
                 📅 {day.date}
                 {day.isToday && (
                   <span className="bg-yellow-400 text-black px-2 py-0.5 rounded-full text-xs ml-2">
@@ -107,7 +126,7 @@ function WeeklyWeather() {
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap gap-20 justify-center sm:justify-end mt-3 sm:mt-0 text-sm">
+              <div className="flex flex-wrap gap-3 justify-center sm:justify-end mt-3 sm:mt-0 text-sm">
                 <span className="bg-blue-500/20 px-2 py-1 rounded-full text-blue-300">
                   🌡️ High: {day.tempMax}°C
                 </span>
@@ -115,9 +134,8 @@ function WeeklyWeather() {
                   🌡️ Low: {day.tempMin}°C
                 </span>
                 <span className="bg-indigo-400/20 px-2 py-1 rounded-full text-indigo-300">
-                  🌧️ Rain: {day.rain > 0 ? `${Math.round(day.rain * 100)}%` : "0%"}
+                  🌧️ Rain: {day.rain}%
                 </span>
-
                 <span className="bg-purple-500/20 px-2 py-1 rounded-full text-purple-300">
                   ☁️ Clouds: {day.clouds > 10 ? `${day.clouds}%` : "Clear"}
                 </span>
@@ -131,8 +149,10 @@ function WeeklyWeather() {
                 exit={{ opacity: 0, height: 0 }}
                 className="relative px-4 pb-4"
               >
-                <div ref={scrollRef} className="relative flex overflow-x-auto gap-1 sm:gap-2">
-                  {/* Hourly Data */}
+                <div
+                  ref={scrollRef}
+                  className="relative flex overflow-x-auto gap-1 sm:gap-2"
+                >
                   {day.hourlyData.map((hour, i) => (
                     <div
                       key={i}
@@ -141,10 +161,14 @@ function WeeklyWeather() {
                       onClick={() => handleCardClick(i)}
                     >
                       <div className="text-gray-300">{hour.time}</div>
-                      <img src={hour.icon} alt="icon" className="w-5 h-5 mx-auto my-1" />
+                      <img
+                        src={hour.icon}
+                        alt="icon"
+                        className="w-5 h-5 mx-auto my-1"
+                      />
                       <div className="text-blue-300">{hour.temp}°C</div>
                       <div className="text-blue-400">
-                        {hour.rain > 0 ? `🌧 ${Math.round(hour.rain * 100)}%` : "🌧️ 0%"}
+                        🌧️ {hour.rain}%
                       </div>
                     </div>
                   ))}
