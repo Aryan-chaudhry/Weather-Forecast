@@ -7,16 +7,19 @@ function EarthquakeTsunamiAlert() {
   const [filter, setFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [locationLabel, setLocationLabel] = useState("");
   const globeRef = useRef();
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 10 * 60 * 1000); // refresh every 10 minutes
+    const interval = setInterval(fetchData, 10 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
   const fetchData = () => {
-    fetch("https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=200&orderby=time")
+    fetch(
+      "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&limit=200&orderby=time"
+    )
       .then((response) => response.json())
       .then((data) => {
         const now = new Date();
@@ -75,6 +78,33 @@ function EarthquakeTsunamiAlert() {
     return () => window.removeEventListener("resize", updateZoomAndItemsPerPage);
   }, []);
 
+  useEffect(() => {
+    if (globeRef.current && globeRef.current.controls()) {
+      globeRef.current.controls().autoRotate = true;
+      globeRef.current.controls().autoRotateSpeed = 0.5;
+    }
+  }, []);
+
+  // 🔄 Reverse geocode using OpenStreetMap's Nominatim (no API key required)
+  const handleGlobeClick = async ({ lat, lon }) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
+      );
+      const result = await response.json();
+      const city =
+        result?.address?.city ||
+        result?.address?.town ||
+        result?.address?.village ||
+        result?.address?.hamlet ||
+        "";
+      const country = result?.address?.country || "";
+      setLocationLabel(`📍 ${city}, ${country}`);
+    } catch (err) {
+      setLocationLabel("Could not determine location.");
+    }
+  };
+
   const filteredData = data.filter((event) => filter === "all" || event.type === filter);
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const paginatedData = filteredData.slice(
@@ -82,18 +112,10 @@ function EarthquakeTsunamiAlert() {
     currentPage * itemsPerPage
   );
 
-  const handlePrev = () => {
-    if (currentPage > 1) setCurrentPage(currentPage - 1);
-  };
-
-  const handleNext = () => {
-    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-  };
-
   return (
     <div className="min-h-screen flex flex-col items-center bg-black text-white px-4 py-6 lg:px-12 lg:py-10">
       <h2 className="text-2xl lg:text-4xl font-extrabold text-center mb-6 lg:mb-10 drop-shadow-md tracking-wide">
-         Earthquake & Tsunami Alerts (Past 24 Hours)
+        Earthquake & Tsunami Alerts (Past 24 Hours)
       </h2>
 
       <select
@@ -107,8 +129,9 @@ function EarthquakeTsunamiAlert() {
         <option value="earthquake">Earthquakes</option>
         <option value="tsunami">Tsunamis</option>
       </select>
-<br /><br />
-      {/* Globe section hidden on screens < 1025px */}
+
+      <div className="text-lg text-green-400 mb-4">{locationLabel}</div>
+
       <div className="relative w-full h-[400px] md:h-[500px] lg:h-[600px] mb-8 hidden lg:flex justify-center items-center">
         <Globe
           ref={globeRef}
@@ -122,11 +145,11 @@ function EarthquakeTsunamiAlert() {
           pointAltitude={() => 0.1}
           pointLabel={(d) => `${d.place} | Mag: ${d.magnitude}`}
           onPointClick={(event) => window.open(event.url, "_blank")}
+          onGlobeClick={handleGlobeClick}
           animateIn={true}
         />
       </div>
-<br /><br />
-      {/* Cards */}
+        <br /><br />
       <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-7xl">
         {paginatedData.length > 0 ? (
           paginatedData.map((event) => (
@@ -155,11 +178,10 @@ function EarthquakeTsunamiAlert() {
         )}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex gap-4 mt-8 flex-wrap justify-center items-center">
           <button
-            onClick={handlePrev}
+            onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
             disabled={currentPage === 1}
             className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50"
           >
@@ -169,7 +191,7 @@ function EarthquakeTsunamiAlert() {
             Page {currentPage} of {totalPages}
           </span>
           <button
-            onClick={handleNext}
+            onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
             disabled={currentPage === totalPages}
             className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50"
           >
