@@ -14,6 +14,6 @@ If you are developing a production application, we recommend using TypeScript an
 ## Demo and Link
 ![Screenshot 2025-04-05 223950](https://github.com/user-attachments/assets/08d052aa-ef45-4df1-998e-811c7c03a43a)
 
-👉 [Weather Forecast Web App](https://weather-forecast-aryan.netlify.app/)
+Live 👉 [Weather Forecast Web App](https://weather-forecast-aryan.netlify.app/)
 
 
