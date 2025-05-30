@@ -2,10 +2,6 @@
 
 A powerful and visually immersive web application built with **React + Vite** that delivers real-time weather forecasts, radar alerts, and natural disaster insights — all on an interactive 3D globe. The UI is sleek, responsive, and optimized for an intuitive user experience across devices.
 
-🔗 **Live Demo**: [weather-forecast-aryan.netlify.app](https://weather-forecast-aryan.netlify.app/)
-
-![App Screenshot](https://github.com/user-attachments/assets/08d052aa-ef45-4df1-998e-811c7c03a43a)
-
 ---
 
 ## 🚀 Key Features
@@ -42,11 +38,9 @@ Crafted with Tailwind CSS and Framer Motion for a beautiful, dynamic interface t
 | **Open-Meteo API**   | Weather forecasts                     |
 | **USGS API**         | Earthquake & Tsunami alerts           |
 | **OpenCage API**     | Location geocoding                    |
-| **Webcams.travel**   | Live webcam feeds                     |
+                     |
 
 ---
-
-## 🧩 Project Structure
 
 
 
